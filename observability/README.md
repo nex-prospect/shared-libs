@@ -1,81 +1,83 @@
 # Observability Library
 
-Biblioteca compartilhada de observabilidade para rastreamento e logging estruturado em microserviços.
+Go library for structured logging and operation tracing in microservices.
 
-## Componentes
+## Components
 
 ### 1. LoggerAdapter
-Adapta o `github.com/gomessguii/logger` para interfaces que exigem logs estruturados com campos.
+Adapts `github.com/gomessguii/logger` to interfaces that require structured logging with field maps.
 
 ### 2. SchedulerTracer
-Sistema de rastreamento para operações de agendamento (scheduling), permitindo:
-- Tracking de sessões de scheduling
-- Snapshots de decisões de agendamento
-- Métricas de qualidade (time collapse, distribuição, etc.)
-- Persistência em local storage, S3, ou PostgreSQL
+Tracing system for scheduling operations, providing:
+- Session tracking
+- Decision snapshots
+- Quality metrics (time distribution, collision detection, etc.)
+- Persistence options: local storage, S3, or PostgreSQL
 
-## Uso
-
-### Adicionar ao seu serviço
+## Installation
 
 ```bash
-cd /path/to/your-service
-go mod edit -replace github.com/nex-prospect/shared-libs/observability=/home/is_me/go/src/github.com/nex-prospect/shared-libs/observability
 go get github.com/nex-prospect/shared-libs/observability
 ```
 
-### Exemplo: LoggerAdapter
+## Usage
+
+### LoggerAdapter
+
+Provides a structured logging interface with context and field support:
 
 ```go
 import (
+    "context"
     "github.com/gomessguii/logger"
     "github.com/nex-prospect/shared-libs/observability"
 )
 
 func main() {
-    myLogger := logger.New()
-    adapter := observability.NewLoggerAdapter(myLogger)
+    log := logger.New()
+    adapter := observability.NewLoggerAdapter(log)
 
-    adapter.LogInfo(ctx, "Processing started", map[string]interface{}{
-        "user_id": "123",
-        "action": "create",
+    ctx := context.Background()
+    adapter.LogInfo(ctx, "Operation completed", map[string]interface{}{
+        "duration_ms": 150,
+        "status": "success",
     })
 }
 ```
 
-### Exemplo: SchedulerTracer
+### SchedulerTracer
+
+Tracks scheduling operations with detailed metrics and snapshots:
 
 ```go
 import "github.com/nex-prospect/shared-libs/observability"
 
 func main() {
-    // Configurar storage (local, S3, ou desabilitado)
-    storageConfig := observability.StorageConfig{
+    // Configure storage
+    config := observability.StorageConfig{
         Enabled:   true,
         Type:      "local",
-        LocalPath: "/tmp/scheduler_sessions",
+        LocalPath: "/tmp/sessions",
     }
 
-    // Criar tracer
-    loggerAdapter := observability.NewLoggerAdapter(myLogger)
-    tracer := observability.NewSchedulerTracerWithConfig(loggerAdapter, storageConfig)
+    // Create tracer
+    adapter := observability.NewLoggerAdapter(log)
+    tracer := observability.NewSchedulerTracerWithConfig(adapter, config)
 
-    // Iniciar sessão de rastreamento
-    session := tracer.StartSession(ctx, cadenceID, "My Cadence", tenantID)
+    // Start tracking session
+    session := tracer.StartSession(ctx, jobID, "Job Name", tenantID)
 
-    // ... realizar operações de scheduling ...
-
-    // Registrar decisões
+    // Record scheduling decisions
     tracer.RecordDecision(ctx, session, observability.SchedulingDecision{
-        DecisionType:      "schedule_lead",
-        LeadID:            leadID,
+        DecisionType:      "schedule_item",
+        ItemID:            itemID,
         FinalScheduleTime: scheduleTime,
     })
 
-    // Completar sessão com resultados
+    // Complete session with results
     tracer.CompleteSession(ctx, session, observability.SchedulingResults{
-        TotalLeadsProcessed: 100,
-        LeadsScheduledToday: 80,
+        TotalItemsProcessed: 100,
+        ItemsScheduled:      85,
     })
 }
 ```
@@ -91,29 +93,32 @@ type Logger interface {
 }
 ```
 
-## Serviços que usam
+## Storage Options
 
-- `campaign-service` - Rastreamento de scheduling de cadências
+The `SchedulerTracer` supports multiple storage backends:
 
-## Estrutura de arquivos
+- **Local**: Stores snapshots as JSON files
+- **S3**: Stores snapshots in AWS S3 bucket
+- **PostgreSQL**: Stores snapshots in database (coming soon)
+- **Disabled**: Structured logs only, no persistence
 
+## Configuration
+
+```go
+// Local storage (default)
+config := observability.DefaultStorageConfig()
+
+// Disabled storage (logs only)
+config := observability.DisabledStorageConfig()
+
+// Custom configuration
+config := observability.StorageConfig{
+    Enabled:   true,
+    Type:      "local",
+    LocalPath: "/var/logs/sessions",
+}
 ```
-observability/
-├── adapter.go           # LoggerAdapter
-├── scheduler_tracer.go  # SchedulerTracer + modelos
-├── go.mod              # Dependências
-└── README.md           # Documentação
-```
 
-## Por que está em shared-libs?
+## License
 
-Para permitir reutilização entre múltiplos microserviços sem criar dependências entre eles. Qualquer serviço que precise de observabilidade estruturada pode importar esta biblioteca.
-
-## Próximos passos
-
-Quando pronto para publicar no GitHub:
-
-1. Criar repositório público `github.com/nex-prospect/shared-libs`
-2. Fazer push do código
-3. Remover o `replace` do go.mod dos serviços
-4. Usar `go get github.com/nex-prospect/shared-libs/observability@latest`
+MIT
