@@ -1,4 +1,4 @@
-module github.com/nex-prospect/shared-libs/observability
+module github.com/nex-prospect/shared-libs
 
 go 1.23
 
